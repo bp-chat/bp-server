@@ -1,5 +1,9 @@
 const std = @import("std");
+const net = std.net;
 
 pub fn main() !void {
-    std.debug.print("Hello, World!", .{});
+    const address = try net.Address.parseIp("127.0.0.1", 5501);
+    const stream = try net.tcpConnectToAddress(address);
+    defer stream.close();
+    std.log.info("Connected!", .{});
 }
