@@ -2,6 +2,8 @@
 
 - [ ] Pass listening port to the server via args
 - [ ] Pass address to the client via args
+- [ ] Read dummy message
+- [ ] Relay dummy message
 
 # DONE
 
