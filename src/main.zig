@@ -25,7 +25,7 @@ pub fn main() !void {
         const conn = try listener.accept();
         defer conn.stream.close();
         std.log.info("Connected! {any}", .{conn.address});
-        const byte_count = try conn.stream.readAll(buffer);
+        const byte_count = try conn.stream.read(buffer);
         std.log.info("Read '{}' bytes, value: '{s}'", .{ byte_count, buffer[0..byte_count] });
     }
 }
