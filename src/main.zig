@@ -18,11 +18,15 @@ pub fn main() !void {
     defer listener.deinit();
     std.log.info("Server listening at {any}\n", .{address});
 
+    const buffer = try allocator.alloc(u8, 64);
+    defer allocator.free(buffer);
     while (true) {
         std.log.info("Waiting for connection...", .{});
         const conn = try listener.accept();
         defer conn.stream.close();
         std.log.info("Connected! {any}", .{conn.address});
+        const byte_count = try conn.stream.readAll(buffer);
+        std.log.info("Read '{}' bytes, value: '{s}'", .{ byte_count, buffer[0..byte_count] });
     }
 }
 
