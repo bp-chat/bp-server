@@ -20,13 +20,20 @@ pub fn main() !void {
 
     const buffer = try allocator.alloc(u8, 64);
     defer allocator.free(buffer);
+
+    var connections = try std.ArrayList(std.net.Server.Connection).initCapacity(allocator, 8);
+    defer connections.deinit();
+
+    var threads = try std.ArrayList(std.Thread).initCapacity(allocator, 8);
+    defer threads.deinit();
+
     while (true) {
         std.log.info("Waiting for connection...", .{});
         const conn = try listener.accept();
-        defer conn.stream.close();
         std.log.info("Connected! {any}", .{conn.address});
-        const byte_count = try conn.stream.read(buffer);
-        std.log.info("Read '{}' bytes, value: '{s}'", .{ byte_count, buffer[0..byte_count] });
+        try connections.append(conn);
+        const thread = try std.Thread.spawn(.{}, handleConnection, .{ &allocator, conn, &connections });
+        try threads.append(thread);
     }
 }
 
@@ -44,4 +51,20 @@ fn getPort(args: *std.process.ArgIterator) !u16 {
     const default_port: u16 = 6680;
     std.log.info("No custom port provided, using default: {}", .{default_port});
     return default_port;
+}
+
+fn handleConnection(allocator: *const std.mem.Allocator, conn: std.net.Server.Connection, all: *std.ArrayList(std.net.Server.Connection)) !void {
+    const buffer = try allocator.alloc(u8, 64);
+    defer allocator.free(buffer);
+    while (true) {
+        const byte_count = try conn.stream.read(buffer);
+        const message = buffer[0..byte_count];
+        std.log.info("{} says: {s}", .{ conn.address, message });
+        for (all.items) |other_conn| {
+            if (conn.address.eql(other_conn.address)) {
+                continue;
+            }
+            _ = try other_conn.stream.write(message);
+        }
+    }
 }

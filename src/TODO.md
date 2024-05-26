@@ -1,9 +1,10 @@
 # TODO
 
-- [ ] Relay dummy message
+- [ ] Understand what the hell is going on, improve naive implementation
 
 # DONE
 
+- [x] Relay dummy message
 - [x] Read dummy message
 - [x] Pass address to the client via args
 - [x] Pass listening port to the server via args
