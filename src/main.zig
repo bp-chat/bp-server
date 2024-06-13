@@ -1,7 +1,52 @@
 const std = @import("std");
 const net = std.net;
+const log = std.log;
 
+const os = std.os;
+const linux = os.linux;
+const io_allocator = std.heap.page_allocator;
+
+const State = enum { accept, recv, send };
+const Socket = struct {
+    handle: usize,
+    buffer: [1024]u8,
+    state: State,
+};
+
+// trying to implement example from https://tigerbeetle.com/blog/a-friendly-abstraction-over-iouring-and-kqueue
+// TODO: WIP
 pub fn main() !void {
+    const entries = 32;
+    const flags = 0;
+    var ring = try linux.IoUring.init(entries, flags);
+    defer ring.deinit();
+
+    var server: Socket = undefined;
+    server.handle = linux.socket(linux.AF.INET, linux.SOCK.STREAM, linux.IPPROTO.TCP);
+    const casted_server_handle: i32 = @intCast(server.handle);
+    defer _ = linux.close(casted_server_handle);
+
+    const port = 6680;
+    var addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, port);
+    var addr_len = addr.getOsSockLen();
+
+    _ = linux.setsockopt(casted_server_handle, linux.SOL.SOCKET, linux.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)), 1);
+    _ = linux.bind(casted_server_handle, &addr.any, addr_len);
+    const backlog = 128;
+    _ = linux.listen(casted_server_handle, backlog);
+
+    server.state = .accept;
+    _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
+
+    log.info("Beginning loop", .{});
+    while (true) {
+        log.info("Waiting...", .{});
+        _ = try ring.submit_and_wait(1);
+        log.info("Got a connection!", .{});
+    }
+}
+
+pub fn mainOld() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
 
