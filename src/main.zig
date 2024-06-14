@@ -43,6 +43,33 @@ pub fn main() !void {
         log.info("Waiting...", .{});
         _ = try ring.submit_and_wait(1);
         log.info("Got a connection!", .{});
+
+        while (ring.cq_ready() > 0) {
+            log.info("You ready?", .{});
+            const cqe = try ring.copy_cqe();
+            const user_data_addr: usize = @intCast(cqe.user_data);
+            const client: *Socket = @ptrFromInt(user_data_addr);
+
+            if (cqe.res < 0) {
+                std.debug.panic("{}({}): {}", .{
+                    client.state,
+                    client.handle,
+                    @as(linux.E, @enumFromInt(-cqe.res)),
+                });
+            }
+
+            switch (client.state) {
+                .accept => {
+                    log.info("accept", .{});
+                },
+                .recv => {
+                    log.info("recv", .{});
+                },
+                .send => {
+                    log.info("send", .{});
+                },
+            }
+        }
     }
 }
 
