@@ -48,7 +48,7 @@ pub fn main() !void {
             log.info("You ready?", .{});
             const cqe = try ring.copy_cqe();
             const user_data_addr: usize = @intCast(cqe.user_data);
-            const client: *Socket = @ptrFromInt(user_data_addr);
+            var client: *Socket = @ptrFromInt(user_data_addr);
 
             if (cqe.res < 0) {
                 std.debug.panic("{}({}): {}", .{
@@ -61,9 +61,20 @@ pub fn main() !void {
             switch (client.state) {
                 .accept => {
                     log.info("accept", .{});
+                    client = try io_allocator.create(Socket);
+                    client.handle = @intCast(cqe.res);
+                    client.state = .recv;
+                    const casted_client_handle: i32 = @intCast(client.handle);
+                    _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
                 },
                 .recv => {
                     log.info("recv", .{});
+                    const read: usize = @intCast(cqe.res);
+                    client.state = .send;
+                    const msg = client.buffer[0..read];
+                    log.info("recv: {s}", .{msg});
+                    const casted_client_handle: i32 = @intCast(client.handle);
+                    _ = try ring.send(@intFromPtr(client), casted_client_handle, msg, 0);
                 },
                 .send => {
                     log.info("send", .{});
