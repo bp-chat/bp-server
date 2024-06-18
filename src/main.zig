@@ -78,6 +78,10 @@ pub fn main() !void {
                 },
                 .send => {
                     log.info("send", .{});
+                    const casted_client_handle: i32 = @intCast(client.handle);
+                    _ = linux.close(casted_client_handle);
+                    io_allocator.destroy(client);
+                    log.info("Client shutdown", .{});
                 },
             }
         }
