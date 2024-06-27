@@ -42,7 +42,7 @@ pub fn main() !void {
     while (true) {
         log.info("Waiting...", .{});
         _ = try ring.submit_and_wait(1);
-        log.info("Got a connection!", .{});
+        log.info("Go", .{});
 
         while (ring.cq_ready() > 0) {
             log.info("You ready?", .{});
@@ -81,7 +81,9 @@ pub fn main() !void {
                     const casted_client_handle: i32 = @intCast(client.handle);
                     _ = linux.close(casted_client_handle);
                     io_allocator.destroy(client);
-                    log.info("Client shutdown", .{});
+                    log.info("send: Client shutdown", .{});
+                    _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
+                    log.info("send: accept again", .{});
                 },
             }
         }
