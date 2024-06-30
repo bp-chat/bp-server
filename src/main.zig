@@ -86,7 +86,7 @@ pub fn main() !void {
                     const casted_client_handle: i32 = @intCast(client.handle);
                     _ = linux.close(casted_client_handle);
                     io_allocator.destroy(client);
-                    log.info("send: Client shutdown", .{});
+                    log.info("send: Client shutdown. client_handle={}", .{casted_client_handle});
                 },
             }
         }
