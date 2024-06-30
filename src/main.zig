@@ -25,6 +25,7 @@ pub fn main() !void {
     server.handle = linux.socket(linux.AF.INET, linux.SOCK.STREAM, linux.IPPROTO.TCP);
     const casted_server_handle: i32 = @intCast(server.handle);
     defer _ = linux.close(casted_server_handle);
+    log.info("main: server_handle={}", .{casted_server_handle});
 
     const port = 6680;
     var addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, port);
@@ -65,6 +66,7 @@ pub fn main() !void {
                     client.handle = @intCast(cqe.res);
                     client.state = .recv;
                     const casted_client_handle: i32 = @intCast(client.handle);
+                    log.info("accept: client_handle={}", .{casted_client_handle});
                     _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
                 },
                 .recv => {
