@@ -68,6 +68,9 @@ pub fn main() !void {
                     const casted_client_handle: i32 = @intCast(client.handle);
                     log.info("accept: client_handle={}", .{casted_client_handle});
                     _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
+
+                    _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
+                    log.info("accept: accept another", .{});
                 },
                 .recv => {
                     log.info("recv", .{});
@@ -84,8 +87,6 @@ pub fn main() !void {
                     _ = linux.close(casted_client_handle);
                     io_allocator.destroy(client);
                     log.info("send: Client shutdown", .{});
-                    _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
-                    log.info("send: accept again", .{});
                 },
             }
         }
