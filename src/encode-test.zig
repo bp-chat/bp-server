@@ -30,7 +30,7 @@ test "should encode" {
     try testing.expect(actual[6] == 0xF0);
 }
 
-fn decode(data: []u8) FictionalCommand {
+pub fn decode(data: []u8) FictionalCommand {
     return FictionalCommand{ .version = (@as(u16, data[0]) << 8) | @as(u16, data[1]), .command_ref_id = data[3], .command_id = (@as(u16, data[5]) << 8) | @as(u16, data[6]) };
 }
 
