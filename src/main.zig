@@ -38,10 +38,16 @@ pub fn main() !void {
 
     server.state = .accept;
 
+    try echoServer(&ring, server, &addr, &addr_len);
+}
+
+fn echoServer(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32) !void {
+    const casted_server_handle: i32 = @intCast(server.handle);
+
     log.info("Beginning loop", .{});
     while (true) {
         log.info("main loop: accept", .{});
-        _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
+        _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, addr_len, 0);
 
         log.info("Waiting...", .{});
         _ = try ring.submit_and_wait(1);
