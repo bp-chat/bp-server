@@ -38,7 +38,7 @@ pub fn main() !void {
 
     server.state = .accept;
 
-    try echoServer(&ring, server, &addr, &addr_len);
+    try chat(&ring, server, &addr, &addr_len);
 }
 
 fn echoServer(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32) !void {
@@ -92,6 +92,79 @@ fn echoServer(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len
                     _ = linux.close(casted_client_handle);
                     io_allocator.destroy(client);
                     log.info("send: Client shutdown. client_handle={}", .{casted_client_handle});
+                },
+            }
+        }
+    }
+}
+
+fn chat(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32) !void {
+    const casted_server_handle: i32 = @intCast(server.handle);
+
+    var clients = std.AutoHashMap(usize, Socket).init(io_allocator);
+    defer clients.deinit();
+
+    const max_clients = 3;
+    try clients.ensureTotalCapacity(max_clients);
+
+    log.info("Beginning loop", .{});
+    while (true) {
+        log.info("main loop: accept", .{});
+        _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, addr_len, 0);
+
+        log.info("Waiting...", .{});
+        _ = try ring.submit_and_wait(1);
+        log.info("Go", .{});
+
+        while (ring.cq_ready() > 0) {
+            log.info("You ready?", .{});
+            const cqe = try ring.copy_cqe();
+            const user_data_addr: usize = @intCast(cqe.user_data);
+            var client: *Socket = @ptrFromInt(user_data_addr);
+
+            if (cqe.res < 0) {
+                std.debug.panic("{}({}): {}", .{
+                    client.state,
+                    client.handle,
+                    @as(linux.E, @enumFromInt(-cqe.res)),
+                });
+            }
+
+            switch (client.state) {
+                .accept => {
+                    log.info("accept", .{});
+                    client = try io_allocator.create(Socket);
+                    client.handle = @intCast(cqe.res);
+                    client.state = .recv;
+                    clients.putAssumeCapacity(client.handle, client.*);
+                    const casted_client_handle: i32 = @intCast(client.handle);
+                    log.info("accept: client_handle={}", .{casted_client_handle});
+                    _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
+                },
+                .recv => {
+                    log.info("recv", .{});
+                    const read: usize = @intCast(cqe.res);
+                    const msg = client.buffer[0..read];
+                    log.info("recv: {s}", .{msg});
+                    var client_iterator = clients.valueIterator();
+                    while (client_iterator.next()) |client_it| {
+                        if (client.handle == client_it.handle) {
+                            continue;
+                        }
+                        client_it.state = .send;
+                        log.info("recv: Sending message. from={}; to={}; msg={s}", .{ client.handle, client_it.handle, msg });
+                        const casted_client_handle: i32 = @intCast(client_it.handle);
+                        _ = try ring.send(@intFromPtr(client_it), casted_client_handle, msg, 0);
+                    }
+
+                    const casted_client_handle: i32 = @intCast(client.handle);
+                    _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
+                },
+                .send => {
+                    log.info("send: Sent. to={}", .{client.handle});
+                    client.state = .recv;
+                    const casted_client_handle: i32 = @intCast(client.handle);
+                    _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
                 },
             }
         }
