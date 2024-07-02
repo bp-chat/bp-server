@@ -37,10 +37,12 @@ pub fn main() !void {
     _ = linux.listen(casted_server_handle, backlog);
 
     server.state = .accept;
-    _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
 
     log.info("Beginning loop", .{});
     while (true) {
+        log.info("main loop: accept", .{});
+        _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
+
         log.info("Waiting...", .{});
         _ = try ring.submit_and_wait(1);
         log.info("Go", .{});
@@ -68,9 +70,6 @@ pub fn main() !void {
                     const casted_client_handle: i32 = @intCast(client.handle);
                     log.info("accept: client_handle={}", .{casted_client_handle});
                     _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
-
-                    _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, &addr_len, 0);
-                    log.info("accept: accept another", .{});
                 },
                 .recv => {
                     log.info("recv", .{});
