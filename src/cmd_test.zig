@@ -63,25 +63,31 @@ fn getPort(args: *std.process.ArgIterator) !u16 {
 }
 
 fn handleConnection(allocator: *const std.mem.Allocator, conn: std.net.Server.Connection, all: *std.ArrayList(NamedConn)) !void {
-    const buffer = try allocator.alloc(u8, 2048);
+    const buffer = try allocator.alloc(u8, 4048);
     defer allocator.free(buffer);
     while (true) {
         const byte_count = try conn.stream.read(buffer);
         const message = buffer[0..byte_count];
-        std.log.info("{} msg: {x}", .{ conn.address, message });
-        printCmdName(message);
-        for (all.items) |conn_wrapper| {
-            var other_conn = &conn_wrapper.cnn;
-            if (conn.address.eql(other_conn.address)) {
-                continue;
-            }
-            _ = try other_conn.stream.write(message);
+        const cmd = try serde.decode(message, allocator.*);
+        std.log.info("{} msg: {x} {}", .{ conn.address, message, message.len });
+        switch (cmd.command_id) {
+            0 => std.debug.print("ignore unknown for now", .{}),
+            1 => std.debug.print("ignore connect for now", .{}),
+            2 => {
+                for (all.items) |conn_wrapper| {
+                    var other_conn = &conn_wrapper.cnn;
+                    if (conn.address.eql(other_conn.address)) {
+                        continue;
+                    }
+                    _ = try other_conn.stream.write(message);
+                }
+            },
+            3 => {
+                for (cmd.args.items, 0..) |d, i| {
+                    std.debug.print("{} - {x}\n", .{ i, d });
+                }
+            },
+            else => std.debug.print("ignore unknowkn for now", .{}),
         }
     }
-}
-
-//sry I'm lazy :(
-fn printCmdName(message: []u8) void {
-    const cmd = serde.decode(message);
-    std.log.info("version {}\nsync {}\n id {}", .{ cmd.version, cmd.command_ref_id, cmd.command_id });
 }

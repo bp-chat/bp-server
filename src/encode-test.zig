@@ -36,19 +36,18 @@ test "should encode" {
     try testing.expect(actual[6] == 0xF0);
 }
 
-pub fn decode(data: []u8) std.mem.Allocator.Error!FictionalCommand {
+pub fn decode(data: []u8, allocator: std.mem.Allocator) std.mem.Allocator.Error!FictionalCommand {
     const version = (@as(u16, data[0]) << 8) | @as(u16, data[1]);
     const sync_id = data[3];
     const cmd_id = (@as(u16, data[5]) << 8) | @as(u16, data[6]);
-    var args = std.ArrayList([]u8).init(test_allocator);
+    var args = std.ArrayList([]u8).init(allocator);
     var start: usize = 8;
     for (data[start..], start..) |bit, i| {
-        // std.debug.print("{}  {}-{x}\n", .{ start, i, bit });
         if (bit == 0x0a) {
             const ta = data[start..i];
+            std.debug.print("\ns{}d{X}l{}", .{ start, ta, ta.len });
             try args.append(ta);
             start = i + 1;
-            // std.debug.print("appended {x} rly?\n", .{ta});
         }
     }
     return FictionalCommand{ .version = version, .command_ref_id = sync_id, .command_id = cmd_id, .args = args };
@@ -56,7 +55,7 @@ pub fn decode(data: []u8) std.mem.Allocator.Error!FictionalCommand {
 
 test "should decode" {
     var input = [_]u8{ 0xF0, 0x0F, 0x0a, 0x03, 0x0a, 0x1f, 0xf1, 0x0a, 0x01, 0x04, 0x05, 0x0a, 0x02, 0x03, 0x0a };
-    var actual = try decode(&input);
+    var actual = try decode(&input, &test_allocator);
     defer actual.args.deinit();
     try testing.expect(actual.version == 0xf00f);
     try testing.expect(actual.command_ref_id == 3);
