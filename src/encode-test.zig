@@ -45,10 +45,25 @@ pub fn decode(data: []u8, allocator: std.mem.Allocator) std.mem.Allocator.Error!
     for (data[start..], start..) |bit, i| {
         if (bit == 0x0a) {
             const ta = data[start..i];
-            std.debug.print("\ns{}d{X}l{}", .{ start, ta, ta.len });
             try args.append(ta);
             start = i + 1;
         }
+    }
+    return FictionalCommand{ .version = version, .command_ref_id = sync_id, .command_id = cmd_id, .args = args };
+}
+
+pub fn decode_sized(data: []u8, allocator: std.mem.Allocator) std.mem.Allocator.Error!FictionalCommand {
+    const version = (@as(u16, data[0]) << 8) | @as(u16, data[1]);
+    const sync_id = data[2];
+    const cmd_id = (@as(u16, data[3]) << 8) | @as(u16, data[4]);
+    var args = std.ArrayList([]u8).init(allocator);
+    var start: usize = 5;
+    while (start < data.len) {
+        const value_idx = start + 4;
+        const arg_size: u32 = std.mem.readInt(u32, data[start..value_idx][0..4], std.builtin.Endian.big);
+        const arg_value = data[value_idx .. value_idx + arg_size];
+        try args.append(arg_value);
+        start += 4 + arg_size;
     }
     return FictionalCommand{ .version = version, .command_ref_id = sync_id, .command_id = cmd_id, .args = args };
 }
