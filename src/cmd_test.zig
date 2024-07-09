@@ -5,10 +5,11 @@ const log = std.log;
 const os = std.os;
 const linux = os.linux;
 const io_allocator = std.heap.page_allocator;
+const server = std.net.Server;
 
 const serde = @import("encode-test.zig");
 
-const NamedConn = struct { name: []u8, cnn: std.net.Server.Connection };
+const UserData = struct { name: []u8, idk: []u8, spk: []u8, sig: []u8, epk: []u8, esg: []u8 };
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -30,7 +31,7 @@ pub fn main() !void {
     const buffer = try allocator.alloc(u8, 64);
     defer allocator.free(buffer);
 
-    var connections = try std.ArrayList(NamedConn).initCapacity(allocator, 8);
+    var connections = try std.ArrayList(server.Connection).initCapacity(allocator, 8);
     defer connections.deinit();
 
     var threads = try std.ArrayList(std.Thread).initCapacity(allocator, 8);
@@ -41,7 +42,7 @@ pub fn main() !void {
         const conn = try listener.accept();
         std.log.info("Connected! {any}", .{conn.address});
 
-        try connections.append(NamedConn{ .name = &[_]u8{}, .cnn = conn });
+        try connections.append(conn);
         const thread = try std.Thread.spawn(.{}, handleConnection, .{ &allocator, conn, &connections });
         try threads.append(thread);
     }
@@ -62,20 +63,20 @@ fn getPort(args: *std.process.ArgIterator) !u16 {
     return default_port;
 }
 
-fn handleConnection(allocator: *const std.mem.Allocator, conn: std.net.Server.Connection, all: *std.ArrayList(NamedConn)) !void {
+fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection, all: *std.ArrayList(server.Connection)) !void {
     const buffer = try allocator.alloc(u8, 4048);
     defer allocator.free(buffer);
+    var user: UserData = undefined;
     while (true) {
         const byte_count = try conn.stream.read(buffer);
         const message = buffer[0..byte_count];
-        const cmd = try serde.decode(message, allocator.*);
-        std.log.info("{} msg: {x} {}", .{ conn.address, message, message.len });
+        const cmd = try serde.decode_sized(message, allocator.*);
+        defer cmd.args.deinit();
         switch (cmd.command_id) {
             0 => std.debug.print("ignore unknown for now", .{}),
             1 => std.debug.print("ignore connect for now", .{}),
             2 => {
-                for (all.items) |conn_wrapper| {
-                    var other_conn = &conn_wrapper.cnn;
+                for (all.items) |other_conn| {
                     if (conn.address.eql(other_conn.address)) {
                         continue;
                     }
@@ -85,6 +86,21 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: std.net.Server.Co
             3 => {
                 for (cmd.args.items, 0..) |d, i| {
                     std.debug.print("{} - {x}\n", .{ i, d });
+                }
+                user = UserData{ .name = cmd.args.items[0], .idk = cmd.args.items[1], .spk = cmd.args.items[2], .sig = cmd.args.items[3], .epk = cmd.args.items[4], .esg = cmd.args.items[5] };
+            },
+            4 => {
+                //broadcast this connection keys for now...
+                for (all.items) |other| {
+                    if (other.address.eql(conn.address)) {
+                        continue;
+                    }
+                    _ = try other.stream.write(user.name);
+                    _ = try other.stream.write(user.idk);
+                    _ = try other.stream.write(user.spk);
+                    _ = try other.stream.write(user.sig);
+                    _ = try other.stream.write(user.epk);
+                    _ = try other.stream.write(user.esg);
                 }
             },
             else => std.debug.print("ignore unknowkn for now", .{}),
