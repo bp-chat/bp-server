@@ -1,6 +1,8 @@
 # TODO
 
 - [ ] Understand what the hell is going on, improve naive implementation
+- [ ] Define and implement the communication abstraction
+- [ ] Clean up -test files.
 
 # DONE
 

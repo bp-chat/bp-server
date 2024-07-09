@@ -91,16 +91,21 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
             },
             4 => {
                 //broadcast this connection keys for now...
+                var args = std.ArrayList([]u8).init(allocator.*);
+                _ = try args.append(user.name);
+                _ = try args.append(user.idk);
+                _ = try args.append(user.spk);
+                _ = try args.append(user.sig);
+                _ = try args.append(user.epk);
+                _ = try args.append(user.esg);
+                defer args.deinit();
+                const out_cmd = serde.FictionalCommand{ .version = 0, .command_ref_id = 8, .command_id = 4, .args = args };
+                const out_msg = try serde.encode_size(out_cmd, allocator.*);
                 for (all.items) |other| {
                     if (other.address.eql(conn.address)) {
                         continue;
                     }
-                    _ = try other.stream.write(user.name);
-                    _ = try other.stream.write(user.idk);
-                    _ = try other.stream.write(user.spk);
-                    _ = try other.stream.write(user.sig);
-                    _ = try other.stream.write(user.epk);
-                    _ = try other.stream.write(user.esg);
+                    _ = try other.stream.write(out_msg);
                 }
             },
             else => std.debug.print("ignore unknowkn for now", .{}),

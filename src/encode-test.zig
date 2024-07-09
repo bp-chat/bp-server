@@ -3,7 +3,7 @@ const Stream = std.Stream;
 const testing = std.testing;
 const test_allocator = std.testing.allocator;
 
-const FictionalCommand = struct { version: u16, command_ref_id: u8, command_id: u16, args: std.ArrayList([]u8) };
+pub const FictionalCommand = struct { version: u16, command_ref_id: u8, command_id: u16, args: std.ArrayList([]u8) };
 
 fn encode(command: FictionalCommand) []u8 {
     var res: [7]u8 = undefined;
@@ -15,6 +15,28 @@ fn encode(command: FictionalCommand) []u8 {
     res[5] = @truncate(command.command_id >> 8);
     res[6] = @truncate(command.command_id);
     return &res;
+}
+
+pub fn encode_size(command: FictionalCommand, allocator: std.mem.Allocator) std.mem.Allocator.Error![]u8 {
+    var builder = std.ArrayList(u8).init(allocator);
+    defer builder.deinit();
+    try builder.append(@truncate(command.version >> 8));
+    try builder.append(@truncate(command.version));
+    try builder.append(command.command_ref_id);
+    try builder.append(@truncate(command.command_id >> 8));
+    try builder.append(@truncate(command.command_id));
+    for (command.args.items) |a| {
+        try builder.append(@truncate(a.len >> 24));
+        try builder.append(@truncate(a.len >> 16));
+        try builder.append(@truncate(a.len >> 8));
+        try builder.append(@truncate(a.len));
+        for (a) |b| {
+            try builder.append(b);
+        }
+    }
+    const final: []u8 = try allocator.alloc(u8, builder.items.len);
+    std.mem.copyForwards(u8, final, builder.items);
+    return final;
 }
 
 test "should encode" {
@@ -34,6 +56,27 @@ test "should encode" {
     try testing.expect(actual[4] == 0x0A);
     try testing.expect(actual[5] == 0x0F);
     try testing.expect(actual[6] == 0xF0);
+}
+
+test "should encode without newline" {
+    var a1 = [_]u8{ 0x04, 0x05, 0x06 };
+    var a2 = [_]u8{ 0x01, 2, 3 };
+    var mtx = std.ArrayList([]u8).init(test_allocator);
+    defer (mtx.deinit());
+    try mtx.append(&a1);
+    try mtx.append(&a2);
+    const cmd = FictionalCommand{ .version = 0xF00F, .command_ref_id = 2, .command_id = 0x0FF0, .args = mtx };
+    const actual = try encode_size(cmd, test_allocator);
+    defer test_allocator.free(actual);
+    try testing.expect(actual.len == 19);
+    try testing.expect(actual[0] == 0xF0);
+    try testing.expect(actual[1] == 0x0F);
+    try testing.expect(actual[2] == 2);
+    try testing.expect(actual[3] == 0x0F);
+    try testing.expect(actual[5] == 0x00);
+    try testing.expect(actual[8] == 0x03);
+    try testing.expect(actual[10] == 0x05);
+    try testing.expect(actual[17] == 0x02);
 }
 
 pub fn decode(data: []u8, allocator: std.mem.Allocator) std.mem.Allocator.Error!FictionalCommand {
@@ -70,7 +113,7 @@ pub fn decode_sized(data: []u8, allocator: std.mem.Allocator) std.mem.Allocator.
 
 test "should decode" {
     var input = [_]u8{ 0xF0, 0x0F, 0x0a, 0x03, 0x0a, 0x1f, 0xf1, 0x0a, 0x01, 0x04, 0x05, 0x0a, 0x02, 0x03, 0x0a };
-    var actual = try decode(&input, &test_allocator);
+    var actual = try decode(&input, test_allocator);
     defer actual.args.deinit();
     try testing.expect(actual.version == 0xf00f);
     try testing.expect(actual.command_ref_id == 3);
