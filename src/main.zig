@@ -144,8 +144,9 @@ fn chat(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32
                 .recv => {
                     log.info("recv", .{});
                     const read: usize = @intCast(cqe.res);
+                    // TODO: if read == 0, disconnect client (destroy memory, remove from map)
                     const msg = client.buffer[0..read];
-                    log.info("recv: {s}", .{msg});
+                    log.info("recv: msg={s}; read={}", .{ msg, read });
                     var client_iterator = clients.valueIterator();
                     while (client_iterator.next()) |client_it| {
                         if (client.handle == client_it.handle) {
