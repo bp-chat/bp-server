@@ -9,7 +9,7 @@ const server = std.net.Server;
 
 const serde = @import("encode-test.zig");
 
-const UserData = struct { name: []u8, idk: []u8, spk: []u8, sig: []u8, epk: []u8, esg: []u8 };
+const UserData = struct { name: []u8, idk: []u8, spk: []u8, sig: []u8, epk: []u8 };
 
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
@@ -87,7 +87,7 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
                 for (cmd.args.items, 0..) |d, i| {
                     std.debug.print("{} - {x}\n", .{ i, d });
                 }
-                user = UserData{ .name = cmd.args.items[0], .idk = cmd.args.items[1], .spk = cmd.args.items[2], .sig = cmd.args.items[3], .epk = cmd.args.items[4], .esg = cmd.args.items[5] };
+                user = UserData{ .name = cmd.args.items[0], .idk = cmd.args.items[1], .spk = cmd.args.items[2], .sig = cmd.args.items[3], .epk = cmd.args.items[4] };
             },
             4 => {
                 //broadcast this connection keys for now...
@@ -97,7 +97,6 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
                 _ = try args.append(user.spk);
                 _ = try args.append(user.sig);
                 _ = try args.append(user.epk);
-                _ = try args.append(user.esg);
                 defer args.deinit();
                 const out_cmd = serde.FictionalCommand{ .version = 0, .command_ref_id = 8, .command_id = 4, .args = args };
                 const out_msg = try serde.encode_size(out_cmd, allocator.*);
