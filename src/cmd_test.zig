@@ -76,6 +76,7 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
             0 => std.debug.print("ignore unknown for now", .{}),
             1 => std.debug.print("ignore connect for now", .{}),
             2 => {
+                std.debug.print("sendig message\n", .{});
                 for (all.items) |other_conn| {
                     if (conn.address.eql(other_conn.address)) {
                         continue;
@@ -84,13 +85,15 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
                 }
             },
             3 => {
-                for (cmd.args.items, 0..) |d, i| {
-                    std.debug.print("{} - {x}\n", .{ i, d });
-                }
+                std.debug.print("saving keys\n", .{});
+                // for (cmd.args.items, 0..) |d, i| {
+                //     std.debug.print("{} - {x}\n", .{ i, d });
+                // }
                 user = UserData{ .name = cmd.args.items[0], .idk = cmd.args.items[1], .spk = cmd.args.items[2], .sig = cmd.args.items[3], .epk = cmd.args.items[4] };
             },
             4 => {
                 //broadcast this connection keys for now...
+                std.debug.print("broadcasting keys\n", .{});
                 var args = std.ArrayList([]u8).init(allocator.*);
                 _ = try args.append(user.name);
                 _ = try args.append(user.idk);
@@ -100,6 +103,7 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
                 defer args.deinit();
                 const out_cmd = serde.FictionalCommand{ .version = 0, .command_ref_id = 8, .command_id = 4, .args = args };
                 const out_msg = try serde.encode_size(out_cmd, allocator.*);
+                std.debug.print("sending:\n{X}\n", .{out_msg});
                 for (all.items) |other| {
                     if (other.address.eql(conn.address)) {
                         continue;
