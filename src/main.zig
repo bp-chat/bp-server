@@ -24,17 +24,34 @@ pub fn main() !void {
     var server: Socket = undefined;
     server.handle = linux.socket(linux.AF.INET, linux.SOCK.STREAM, linux.IPPROTO.TCP);
     const casted_server_handle: i32 = @intCast(server.handle);
-    defer _ = linux.close(casted_server_handle);
+    defer {
+        const close_result = linux.close(casted_server_handle);
+        if (close_result != 0) {
+            log.err("Unable to close socket. handle={}; result={}", .{ casted_server_handle, close_result });
+        }
+    }
     log.info("main: server_handle={}", .{casted_server_handle});
 
     const port = 6680;
     var addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, port);
     var addr_len = addr.getOsSockLen();
 
-    _ = linux.setsockopt(casted_server_handle, linux.SOL.SOCKET, linux.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)), 1);
-    _ = linux.bind(casted_server_handle, &addr.any, addr_len);
+    const setsockopt_result = linux.setsockopt(casted_server_handle, linux.SOL.SOCKET, linux.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)), 1);
+    if (setsockopt_result != 0) {
+        log.err("Could not set socket options. result={}", .{setsockopt_result});
+        std.process.exit(@intCast(setsockopt_result));
+    }
+    const bind_result = linux.bind(casted_server_handle, &addr.any, addr_len);
+    if (bind_result != 0) {
+        log.err("Could not bind socket. result={}", .{bind_result});
+        std.process.exit(@intCast(bind_result));
+    }
     const backlog = 128;
-    _ = linux.listen(casted_server_handle, backlog);
+    const listen_result = linux.listen(casted_server_handle, backlog);
+    if (listen_result != 0) {
+        log.err("Could not listen on socket. result={}", .{listen_result});
+        std.process.exit(@intCast(listen_result));
+    }
 
     server.state = .accept;
 
@@ -89,7 +106,10 @@ fn echoServer(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len
                 .send => {
                     log.info("send", .{});
                     const casted_client_handle: i32 = @intCast(client.handle);
-                    _ = linux.close(casted_client_handle);
+                    const close_result = linux.close(casted_client_handle);
+                    if (close_result != 0) {
+                        std.log.warn("Could not close client connection. handle={}; result={}", .{ casted_client_handle, close_result });
+                    }
                     io_allocator.destroy(client);
                     log.info("send: Client shutdown. client_handle={}", .{casted_client_handle});
                 },
