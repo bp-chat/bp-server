@@ -7,10 +7,6 @@ const linux = os.linux;
 const io_allocator = std.heap.page_allocator;
 const server = std.net.Server;
 
-const serde = @import("encode-test.zig");
-
-const UserData = struct { name: []u8, idk: []u8, spk: []u8, sig: []u8, epk: []u8 };
-
 pub fn main() !void {
     var gpa = std.heap.GeneralPurposeAllocator(.{}){};
     defer _ = gpa.deinit();
@@ -66,13 +62,14 @@ fn getPort(args: *std.process.ArgIterator) !u16 {
 fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection, all: *std.ArrayList(server.Connection)) !void {
     const buffer = try allocator.alloc(u8, 4048);
     defer allocator.free(buffer);
-    var user: UserData = undefined;
+    // var user: UserData = undefined;
     while (true) {
         const byte_count = try conn.stream.read(buffer);
         const message = buffer[0..byte_count];
-        const cmd = try serde.decode_sized(message, allocator.*);
-        defer cmd.args.deinit();
-        switch (cmd.command_id) {
+        // const cmd = try serde.decode_sized(message, allocator.*);
+        const cmd = 0;
+        // defer cmd.args.deinit();
+        switch (cmd) {
             0 => std.debug.print("ignore unknown for now", .{}),
             1 => std.debug.print("ignore connect for now", .{}),
             2 => {
@@ -89,27 +86,27 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
                 // for (cmd.args.items, 0..) |d, i| {
                 //     std.debug.print("{} - {x}\n", .{ i, d });
                 // }
-                user = UserData{ .name = cmd.args.items[0], .idk = cmd.args.items[1], .spk = cmd.args.items[2], .sig = cmd.args.items[3], .epk = cmd.args.items[4] };
+                // user = UserData{ .name = cmd.args.items[0], .idk = cmd.args.items[1], .spk = cmd.args.items[2], .sig = cmd.args.items[3], .epk = cmd.args.items[4] };
             },
             4 => {
                 //broadcast this connection keys for now...
                 std.debug.print("broadcasting keys\n", .{});
-                var args = std.ArrayList([]u8).init(allocator.*);
-                _ = try args.append(user.name);
-                _ = try args.append(user.idk);
-                _ = try args.append(user.spk);
-                _ = try args.append(user.sig);
-                _ = try args.append(user.epk);
-                defer args.deinit();
-                const out_cmd = serde.FictionalCommand{ .version = 0, .command_ref_id = 8, .command_id = 4, .args = args };
-                const out_msg = try serde.encode_size(out_cmd, allocator.*);
-                std.debug.print("sending:\n{X}\n", .{out_msg});
-                for (all.items) |other| {
-                    if (other.address.eql(conn.address)) {
-                        continue;
-                    }
-                    _ = try other.stream.write(out_msg);
-                }
+                // var args = std.ArrayList([]u8).init(allocator.*);
+                // _ = try args.append(user.name);
+                // _ = try args.append(user.idk);
+                // _ = try args.append(user.spk);
+                // _ = try args.append(user.sig);
+                // _ = try args.append(user.epk);
+                // defer args.deinit();
+                // const out_cmd = serde.FictionalCommand{ .version = 0, .command_ref_id = 8, .command_id = 4, .args = args };
+                // const out_msg = try serde.encode_size(out_cmd, allocator.*);
+                // std.debug.print("sending:\n{X}\n", .{out_msg});
+                // for (all.items) |other| {
+                // if (other.address.eql(conn.address)) {
+                // continue;
+                // }
+                // _ = try other.stream.write(out_msg);
+                // }
             },
             else => std.debug.print("ignore unknowkn for now", .{}),
         }
