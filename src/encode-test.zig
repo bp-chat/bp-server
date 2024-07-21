@@ -2,6 +2,8 @@ const std = @import("std");
 const Stream = std.Stream;
 const testing = std.testing;
 const test_allocator = std.testing.allocator;
+const assert = std.debug.assert;
+const Endian = std.builtin.Endian;
 
 pub const FictionalCommand = struct { version: u16, command_ref_id: u8, command_id: u16, args: std.ArrayList([]u8) };
 
@@ -113,6 +115,7 @@ pub fn decode_sized(data: []u8, allocator: std.mem.Allocator) std.mem.Allocator.
 
 test "should decode" {
     var input = [_]u8{ 0xF0, 0x0F, 0x0a, 0x03, 0x0a, 0x1f, 0xf1, 0x0a, 0x01, 0x04, 0x05, 0x0a, 0x02, 0x03, 0x0a };
+    // const t = std.mem.bytesAsValue(FictionalCommand, input);
     var actual = try decode(&input, test_allocator);
     defer actual.args.deinit();
     try testing.expect(actual.version == 0xf00f);
@@ -126,5 +129,38 @@ test "should decode" {
     try testing.expect(actual.args.items[0][2] == 5);
     try testing.expect(actual.args.items[1][0] == 2);
     try testing.expect(actual.args.items[1][1] == 3);
-    //TODO do actual implement init and deinit
+}
+
+const Header = struct { version: u16, command_ref_id: u8, command_id: u16 };
+const GenericCommand = struct { header: Header, body: []u8 };
+
+fn decode_header(data: []u8) Header {
+    assert(data.len >= 5);
+    return Header{ .version = std.mem.readInt(u16, data[0..2], Endian.big), .command_ref_id = data[2], .command_id = std.mem.readInt(u16, data[3..5], Endian.big) };
+}
+
+fn decode_new(data: []u8) GenericCommand {
+    assert(data.len >= 5);
+    //TODO ASSERT MAX LEN
+    return GenericCommand{ .header = decode_header(data[0..5]), .body = data[5..] };
+}
+
+test "should decode header" {
+    var input = [_]u8{
+        0x00,
+        0x01,
+        0x02,
+        0x00,
+        0x03,
+        0xff,
+        0xff,
+        0xff,
+        0xff,
+        0xff,
+    };
+    const actual = decode_header(&input);
+    std.debug.print("\ndecoded {}\n", .{actual});
+    try testing.expectEqual(0x01, actual.version);
+    try testing.expectEqual(0x02, actual.command_ref_id);
+    try testing.expectEqual(0x03, actual.command_id);
 }
