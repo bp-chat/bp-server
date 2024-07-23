@@ -2,13 +2,13 @@
 
 - [ ] Define and implement the communication abstraction
 - [ ] Clean up -test files.
-- [ ] fix client not being able to reconnect
 - [ ] io_uring: proper disconnet handling
 - [ ] secure connection with SSL or whatever is appropriate (more secure)
 - [ ] implement raw sockets and io_uring abstraction
 
 # DONE
 
+- [x] fix client not being able to reconnect
 - [x] do not ignore Linux socket connection errors and the like
 - [x] Understand what the hell is going on, improve naive implementation
 - [x] Relay dummy message
