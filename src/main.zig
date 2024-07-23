@@ -36,10 +36,12 @@ pub fn main() !void {
     var addr = std.net.Address.initIp4(.{ 127, 0, 0, 1 }, port);
     var addr_len = addr.getOsSockLen();
 
-    const setsockopt_result = linux.setsockopt(casted_server_handle, linux.SOL.SOCKET, linux.SO.REUSEADDR, &std.mem.toBytes(@as(c_int, 1)), 1);
+    const setsockopt_bytes = std.mem.toBytes(@as(c_int, 1));
+    const setsockopt_result = linux.setsockopt(casted_server_handle, linux.SOL.SOCKET, linux.SO.REUSEADDR, &setsockopt_bytes, setsockopt_bytes.len);
     if (setsockopt_result != 0) {
         log.err("Could not set socket options. result={}", .{setsockopt_result});
-        std.process.exit(@intCast(setsockopt_result));
+        // TODO: improve exit code handling
+        std.process.exit(1);
     }
     const bind_result = linux.bind(casted_server_handle, &addr.any, addr_len);
     if (bind_result != 0) {
