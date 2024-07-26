@@ -5,6 +5,7 @@ const log = std.log;
 const os = std.os;
 const linux = os.linux;
 const io_allocator = std.heap.page_allocator;
+const assert = std.debug.assert;
 
 const State = enum { accept, recv, send };
 const Socket = struct {
@@ -166,7 +167,25 @@ fn chat(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32
                 .recv => {
                     log.info("recv", .{});
                     const read: usize = @intCast(cqe.res);
-                    // TODO: if read == 0, disconnect client (destroy memory, remove from map)
+                    const casted_client_handle: i32 = @intCast(client.handle);
+                    if (read == 0) {
+                        const handle = client.handle;
+                        assert(clients.remove(handle));
+                        // TODO: (michel) is this leaking memory? How to know?
+                        // TODO: (michel) not sure if leaking memory, but it's broken. Simple scenario to replicate the bug:
+                        // - open terminal A, connect with telnet
+                        // - open terminal B, connect with telnet
+                        // - send message with terminal A
+                        // - quit telnet with terminal B
+                        // - boom
+                        io_allocator.destroy(client);
+                        const close_result = linux.close(casted_client_handle);
+                        if (close_result != 0) {
+                            log.err("Unable to close client socket. handle={}; result={}", .{ handle, close_result });
+                        }
+                        log.info("Client disconnected. handle={}", .{handle});
+                        continue;
+                    }
                     const msg = client.buffer[0..read];
                     log.info("recv: msg={s}; read={}", .{ msg, read });
                     var client_iterator = clients.valueIterator();
@@ -176,11 +195,10 @@ fn chat(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32
                         }
                         client_it.state = .send;
                         log.info("recv: Sending message. from={}; to={}; msg={s}", .{ client.handle, client_it.handle, msg });
-                        const casted_client_handle: i32 = @intCast(client_it.handle);
-                        _ = try ring.send(@intFromPtr(client_it), casted_client_handle, msg, 0);
+                        const casted_client_it_handle: i32 = @intCast(client_it.handle);
+                        _ = try ring.send(@intFromPtr(client_it), casted_client_it_handle, msg, 0);
                     }
 
-                    const casted_client_handle: i32 = @intCast(client.handle);
                     _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
                 },
                 .send => {
