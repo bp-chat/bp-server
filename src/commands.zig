@@ -12,13 +12,14 @@ const Header = struct {
     commandId: u16,
 };
 
-const Command = struct {
-    const maxLength = 4096;
+pub const Command = struct {
+    //TODO move to a better place with the rest of the env configs
+    pub const maxLength = 4096;
 
     header: Header,
     body: []u8,
 
-    fn encode(self: Command, buffer: []u8) void {
+    pub fn encode(self: Command, buffer: []u8) void {
         std.mem.writeInt(u16, buffer[0..2], self.header.version, Endian.big);
         buffer[2] = self.header.commandRefId;
         std.mem.writeInt(u16, buffer[3..5], self.header.commandId, Endian.big);
@@ -34,8 +35,8 @@ const Command = struct {
         };
     }
 
-    //TODO consider accepting a fixed length array/slice
-    fn decode(data: []u8) Command {
+    //TODO consider accepting a fixed length array
+    pub fn decode(data: []u8) Command {
         assert(data.len <= maxLength);
         return Command{
             .header = decode_header(data[0..5]),
@@ -44,9 +45,9 @@ const Command = struct {
     }
 };
 
-const MessageCommand = struct {
-    const length = 1040;
-    const commandId = 2;
+pub const MessageCommand = struct {
+    pub const length = 1040;
+    pub const commandId = 2;
 
     buffer: *[length]u8,
     recipient: *[16]u8,
@@ -71,9 +72,9 @@ const MessageCommand = struct {
     }
 };
 
-const RegisterKeysCommand = struct {
-    const length = 176;
-    const commandId = 3;
+pub const RegisterKeysCommand = struct {
+    pub const length = 176;
+    pub const commandId = 3;
 
     buffer: *[length]u8,
     user: [16]u8,
@@ -82,7 +83,7 @@ const RegisterKeysCommand = struct {
     signature: [64]u8,
     ephemeralKey: [32]u8,
 
-    fn parse(data: *[length]u8) RegisterKeysCommand {
+    pub fn parse(data: *[length]u8) RegisterKeysCommand {
         return RegisterKeysCommand{
             .buffer = data,
             .user = data[0..16],
@@ -93,7 +94,7 @@ const RegisterKeysCommand = struct {
         };
     }
 
-    fn asCommand(self: RegisterKeysCommand) Command {
+    pub fn asCommand(self: RegisterKeysCommand) Command {
         return Command{
             .header = Header{
                 .version = CURRENT_VERSION,
@@ -107,7 +108,7 @@ const RegisterKeysCommand = struct {
 
 const SimpleTestCommand = struct {
     const length = 5;
-    const commandId = 4;
+    const commandId = 99;
 
     buffer: *[length]u8,
     fake: *[2]u8,
