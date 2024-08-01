@@ -77,11 +77,11 @@ pub const RegisterKeysCommand = struct {
     pub const commandId = 3;
 
     buffer: *[length]u8,
-    user: [16]u8,
-    idKey: [32]u8,
-    signedKey: [32]u8,
-    signature: [64]u8,
-    ephemeralKey: [32]u8,
+    user: *[16]u8,
+    idKey: *[32]u8,
+    signedKey: *[32]u8,
+    signature: *[64]u8,
+    ephemeralKey: *[32]u8,
 
     pub fn parse(data: *[length]u8) RegisterKeysCommand {
         return RegisterKeysCommand{

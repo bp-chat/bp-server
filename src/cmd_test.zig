@@ -60,7 +60,11 @@ fn getPort(args: *std.process.ArgIterator) !u16 {
     return default_port;
 }
 
-fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection, all: *std.ArrayList(server.Connection)) !void {
+fn handleConnection(
+    allocator: *const std.mem.Allocator,
+    conn: server.Connection,
+    all: *std.ArrayList(server.Connection),
+) !void {
     // I don't want a const pointer... maybe we should use one anyway
     var buffer = try allocator.alloc(u8, commands.Command.maxLength);
     defer allocator.free(buffer);
@@ -86,9 +90,7 @@ fn handleConnection(allocator: *const std.mem.Allocator, conn: server.Connection
             },
             commands.RegisterKeysCommand.commandId => {
                 std.debug.print("saving keys\n", .{});
-                if (user == undefined) {
-                    user = commands.RegisterKeysCommand.parse(cmd.body[0..commands.RegisterKeysCommand.length]);
-                }
+                user = commands.RegisterKeysCommand.parse(cmd.body[0..commands.RegisterKeysCommand.length]);
             },
             4 => {
                 //broadcast this connection keys for now...
