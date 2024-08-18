@@ -130,25 +130,36 @@ fn chat(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32
     const max_clients = 3;
     try clients.ensureTotalCapacity(max_clients);
 
-    log.info("Beginning loop", .{});
     while (true) {
-        log.info("main loop: accept", .{});
-        _ = try ring.accept(@intFromPtr(&server), casted_server_handle, &addr.any, addr_len, 0);
+        log.info("accept. handle={}", .{server.handle});
+        _ = try ring.accept(server.handle, casted_server_handle, &addr.any, addr_len, 0);
 
-        log.info("Waiting...", .{});
+        log.info("submit_and_wait", .{});
         _ = try ring.submit_and_wait(1);
-        log.info("Go", .{});
 
         while (ring.cq_ready() > 0) {
-            log.info("You ready?", .{});
             const cqe = try ring.copy_cqe();
             const user_data_addr: usize = @intCast(cqe.user_data);
-            log.info("loop. user_data_addr={}, cqe.res={}", .{ user_data_addr, cqe.res });
-            if (user_data_addr == 0) {
-                log.info("loop, user data is zero", .{});
-                continue;
+            var client: *Socket = undefined;
+            if (user_data_addr == server.handle) {
+                if (cqe.res == 0) {
+                    log.info("NOP, close event", .{});
+                    continue;
+                }
+                // TODO: "statically" allocate every client at server startup. This will require reusing memory and different data structures
+                client = try io_allocator.create(Socket);
+                client.handle = @intCast(cqe.res);
+                client.state = .accept;
+                clients.putAssumeCapacity(client.handle, client);
+                log.info("Client connected. handle={}", .{client.handle});
+            } else {
+                const client_ptr = clients.get(user_data_addr);
+                if (client_ptr == null) {
+                    log.info("NOP, client already disconnected. handle={}", .{user_data_addr});
+                    continue;
+                }
+                client = client_ptr.?;
             }
-            var client: *Socket = @ptrFromInt(user_data_addr);
 
             if (cqe.res < 0) {
                 std.debug.panic("{}({}): {}", .{
@@ -160,49 +171,24 @@ fn chat(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32
 
             switch (client.state) {
                 .accept => {
-                    client = try io_allocator.create(Socket);
-                    client.handle = @intCast(cqe.res);
                     client.state = .recv;
-                    clients.putAssumeCapacity(client.handle, client);
                     const casted_client_handle: i32 = @intCast(client.handle);
-                    log.info("accept: client_handle={}, client_ptr={}", .{ casted_client_handle, @intFromPtr(client) });
-                    _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
+                    _ = try ring.recv(client.handle, casted_client_handle, .{ .buffer = &client.buffer }, 0);
+                    log.info("recv: client_handle={}", .{casted_client_handle});
                 },
                 .recv => {
-                    log.info("recv. client_ptr={}", .{@intFromPtr(client)});
                     const read: usize = @intCast(cqe.res);
                     const casted_client_handle: i32 = @intCast(client.handle);
                     if (read == 0) {
                         const handle = client.handle;
                         assert(clients.remove(handle));
-                        // TODO: (michel) is this leaking memory? How to know?
-                        // TODO: (michel) not sure if leaking memory, but it's broken. Simple scenario to replicate the bug:
-                        // - open terminal A, connect with telnet
-                        // - open terminal B, connect with telnet
-                        // - send message with terminal A
-                        // - quit telnet with terminal B
-                        // - boom
-                        // TODO: the problem was fixed, but changed. What seems to have caused it originally was that a different pointer was being used to destroy the memory.
-                        // According to the `destroy` docs:
-                        // > `ptr` should be the return value of `create`, or otherwise have the same address and alignment property.
-                        // The pointer being passed to `destroy` was _not_ the return value of `create`, it was a pointer from the iterator, and according to log-debugging it _didn't_
-                        // have the same address and the error maybe complained about alignment.
-                        // To fix that the map was changed to store `*Socket` instead of `Socket`. In that way the pointer returned by `create` could be stored in the map and then
-                        // destroyed. As mentioned, that fixed the original problem, but there's still problems.
-                        // For a still unknown reason after processing the first `recv` with `cqe.res == 0` after the client disconnects and destroying the related memory,
-                        // there's at least another completion event related to that client (with the same pointer) with `cqe.res == 0` that gets to the queue. This causes a segfault
-                        // because the memory the pointer is pointing to was freed. There seems to be a couple of ways to approach this problem but arguably the more robust one
-                        // involves not using a pointer for the event's `user_data`, because after _very_ light research there doesn't seem to be a way to figure out from a pointer
-                        // if the pointed-to memory was already freed. In other words, you cannot avoid the segfault. Relying on the client map for knowing each client's status
-                        // then becomes a more robust approach because the map will live for the entire application lifecycle. The map is keyed with the client connection's file
-                        // descriptor, so that could be the event's `user_data`. [TBC]
                         io_allocator.destroy(client);
-                        _ = try ring.close(0, casted_client_handle); // `user_data` is 0 because the "user" has disconnected.
+                        _ = try ring.close(server.handle, casted_client_handle);
                         log.info("Client disconnected. handle={}", .{handle});
                         continue;
                     }
                     const msg = client.buffer[0..read];
-                    log.info("recv: msg={s}; read={}", .{ msg, read });
+                    log.info("recv: msg={s}; read={};", .{ msg, read });
                     var client_iterator = clients.valueIterator();
                     while (client_iterator.next()) |client_it| {
                         if (client.handle == client_it.*.handle) {
@@ -211,16 +197,16 @@ fn chat(ring: *linux.IoUring, server: Socket, addr: *net.Address, addr_len: *u32
                         client_it.*.state = .send;
                         log.info("recv: Sending message. from={}; to={}; msg={s}", .{ client.handle, client_it.*.handle, msg });
                         const casted_client_it_handle: i32 = @intCast(client_it.*.handle);
-                        _ = try ring.send(@intFromPtr(client_it.*), casted_client_it_handle, msg, 0);
+                        _ = try ring.send(client_it.*.handle, casted_client_it_handle, msg, 0);
                     }
 
-                    _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
+                    _ = try ring.recv(client.handle, casted_client_handle, .{ .buffer = &client.buffer }, 0);
                 },
                 .send => {
                     log.info("send: Sent. to={}", .{client.handle});
                     client.state = .recv;
                     const casted_client_handle: i32 = @intCast(client.handle);
-                    _ = try ring.recv(@intFromPtr(client), casted_client_handle, .{ .buffer = &client.buffer }, 0);
+                    _ = try ring.recv(client.handle, casted_client_handle, .{ .buffer = &client.buffer }, 0);
                 },
             }
         }
