@@ -9,6 +9,12 @@
 
 - secure connection with SSL or whatever is appropriate (more secure)
     - research: most secure way to...secure a TCP connection
+        - **answer**: after some small research TLS 1.3 seems to be the way to go. Check the TLS OWASP cheatsheet in one of the links below.
+        - links:
+            - https://security.stackexchange.com/questions/5126/whats-the-difference-between-ssl-tls-and-https
+            - https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html
+            - https://security.stackexchange.com/questions/241493/is-there-any-solution-beside-tls-for-data-in-transit-protection
+            - https://softwareengineering.stackexchange.com/questions/271366/tls-alternatives-that-do-not-require-a-central-authority
     - research: what Zig supports to secure a TCP connection
     - research: how to implement a secure TCP connection in Zig
 
