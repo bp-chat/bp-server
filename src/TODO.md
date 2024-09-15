@@ -5,6 +5,13 @@
 - [ ] secure connection with SSL or whatever is appropriate (more secure)
 - [ ] implement raw sockets and io_uring abstraction
 
+## Implementation outlines
+
+- secure connection with SSL or whatever is appropriate (more secure)
+    - research: most secure way to...secure a TCP connection
+    - research: what Zig supports to secure a TCP connection
+    - research: how to implement a secure TCP connection in Zig
+
 # DONE
 
 - [x] fix disconnect bug with more than one client connected
