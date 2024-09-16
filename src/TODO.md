@@ -16,6 +16,9 @@
             - https://security.stackexchange.com/questions/241493/is-there-any-solution-beside-tls-for-data-in-transit-protection
             - https://softwareengineering.stackexchange.com/questions/271366/tls-alternatives-that-do-not-require-a-central-authority
     - research: what Zig supports to secure a TCP connection
+        - links:
+            - https://ziglang.org/documentation/master/std/#std.crypto.tls
+            - https://github.com/ziglang/zig/issues/14171
     - research: how to implement a secure TCP connection in Zig
 
 # DONE
