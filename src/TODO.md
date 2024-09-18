@@ -19,6 +19,9 @@
         - links:
             - https://ziglang.org/documentation/master/std/#std.crypto.tls
             - https://github.com/ziglang/zig/issues/14171
+            - https://github.com/mattnite/zig-mbedtls
+                - https://github.com/Mbed-TLS/mbedtls
+            - https://harshityadav95.medium.com/tls-termination-proxy-3733b69680cb
     - research: how to implement a secure TCP connection in Zig
 
 # DONE
